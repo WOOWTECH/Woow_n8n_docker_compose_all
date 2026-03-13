@@ -1,153 +1,283 @@
-# n8n with PostgreSQL (Podman)
+# n8n + PostgreSQL Docker Compose (Podman)
 
-Deploy n8n workflow automation platform with PostgreSQL database using Podman.
+Deploy [n8n](https://n8n.io/) workflow automation platform with PostgreSQL database using Podman Compose.
 
 [繁體中文版](README.zh-TW.md)
 
-## Quick Start
+## Architecture
+
+```
+┌──────────────────────────────────────────────────┐
+│            Cloudflare Tunnel (optional)           │
+└─────────────────┬────────────────────────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────────────────────┐
+│              Podman Network (n8n-network)         │
+│                                                  │
+│  ┌──────────────────┐    ┌────────────────────┐  │
+│  │       n8n        │    │    PostgreSQL 16    │  │
+│  │   (latest)       │───▶│    (Alpine)         │  │
+│  │  Port: 15678     │    │  Port: 5432 (int)   │  │
+│  └────────┬─────────┘    └────────┬───────────┘  │
+│           │                       │              │
+│           ▼                       ▼              │
+│     n8n_data vol          postgres_data vol       │
+└──────────────────────────────────────────────────┘
+```
+
+## Prerequisites
+
+- Podman (v4.0+)
+- podman-compose (v1.0+)
 
 ```bash
-# 1. Copy environment file
+# Check versions
+podman --version
+podman-compose --version
+```
+
+## Project Structure
+
+```
+.
+├── docker-compose.yml    # Service definitions (n8n + PostgreSQL)
+├── .env.example          # Environment variable template
+├── .env                  # Actual environment variables (git-ignored)
+├── .gitignore            # Git ignore rules
+├── README.md             # English documentation (this file)
+├── README.zh-TW.md       # Chinese documentation
+└── docs/
+    ├── plans/
+    │   └── 2026-02-17-n8n-postgres-podman-design.md
+    └── skills/
+        └── deploy-n8n-postgres.md   # AI deployment skill
+```
+
+## Quick Start
+
+### Step 1: Clone the repository
+
+```bash
+git clone https://github.com/WOOWTECH/Woow_n8n_docker_compose_all.git
+cd Woow_n8n_docker_compose_all
+```
+
+### Step 2: Configure environment
+
+```bash
 cp .env.example .env
+```
 
-# 2. Edit configuration (optional)
-nano .env
+Edit `.env` and update:
+- `POSTGRES_PASSWORD` - Set a secure password
+- `WEBHOOK_URL` - Replace with your server IP: `http://<SERVER_IP>:15678/`
 
-# 3. Start services
+### Step 3: Start services
+
+```bash
 podman-compose up -d
 ```
 
-Access n8n at: `http://<SERVER_IP>:5678`
+### Step 4: Verify deployment
+
+```bash
+# Check container status
+podman-compose ps
+
+# Health check
+curl -s http://localhost:15678/healthz
+# Expected: {"status":"ok"}
+```
+
+### Step 5: Access n8n
+
+Open `http://<SERVER_IP>:15678` in your browser.
+
+The first user to register becomes the **admin**.
 
 ## Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `POSTGRES_USER` | PostgreSQL username | `n8n` |
-| `POSTGRES_PASSWORD` | PostgreSQL password | `n8n_password` |
+| `POSTGRES_PASSWORD` | PostgreSQL password | *(set in .env)* |
 | `POSTGRES_DB` | Database name | `n8n` |
-| `N8N_PORT` | n8n exposed port | `5678` |
-| `N8N_HOST` | n8n hostname | `localhost` |
+| `N8N_PORT` | n8n exposed port | `15678` |
+| `N8N_HOST` | n8n bind address | `0.0.0.0` |
 | `N8N_PROTOCOL` | Protocol (http/https) | `http` |
-| `WEBHOOK_URL` | Webhook callback URL | `http://localhost:5678/` |
+| `WEBHOOK_URL` | Webhook callback URL | `http://localhost:15678/` |
 | `GENERIC_TIMEZONE` | Timezone | `Asia/Taipei` |
+
+### Key Configuration Notes
+
+- **`N8N_SECURE_COOKIE=false`** is set in `docker-compose.yml` to allow HTTP login on internal networks. If you use HTTPS (e.g., via Cloudflare Tunnel), you can remove this setting.
+- **`N8N_HOST=0.0.0.0`** allows connections from any IP on the network, not just localhost.
+- **Port 15678** is used to avoid conflicts with other services.
 
 ## Common Commands
 
 ```bash
-# Start services
+# Start services (detached)
 podman-compose up -d
 
-# Stop services
+# Stop services (keep volumes)
 podman-compose down
 
-# View logs
+# Stop services and delete ALL data
+podman-compose down -v
+
+# View all logs
 podman-compose logs -f
 
 # View n8n logs only
 podman-compose logs -f n8n
 
-# Restart services
+# View PostgreSQL logs only
+podman-compose logs -f postgres
+
+# Restart all services
 podman-compose restart
 
-# Check status
+# Restart n8n only
+podman-compose restart n8n
+
+# Check container status
 podman-compose ps
+
+# View resolved configuration
+podman-compose config
 ```
 
 ## Backup & Restore
 
-### Backup
+### Backup PostgreSQL
 
 ```bash
-# Backup PostgreSQL data
 podman exec n8n-postgres pg_dump -U n8n n8n > backup_$(date +%Y%m%d_%H%M%S).sql
 ```
 
-### Restore
+### Restore PostgreSQL
 
 ```bash
-# Restore PostgreSQL data
 podman exec -i n8n-postgres psql -U n8n n8n < backup_YYYYMMDD_HHMMSS.sql
+```
+
+### Backup n8n data volume
+
+```bash
+podman volume export n8n_n8n_data > n8n_data_backup_$(date +%Y%m%d_%H%M%S).tar
+```
+
+### Restore n8n data volume
+
+```bash
+podman volume import n8n_n8n_data n8n_data_backup_YYYYMMDD_HHMMSS.tar
+```
+
+## Update n8n
+
+```bash
+# Pull latest image
+podman-compose pull n8n
+
+# Recreate container with new image
+podman-compose up -d
 ```
 
 ## Cloudflare Tunnel Integration
 
-When using Cloudflare Tunnel, update `.env`:
+When using Cloudflare Tunnel for external access, update `.env`:
 
 ```bash
 WEBHOOK_URL=https://n8n.yourdomain.com/
 ```
 
+No other changes needed - the tunnel connects to `http://localhost:15678` internally.
+
 ## Troubleshooting
+
+### Cannot login via HTTP (secure cookie error)
+
+Ensure `N8N_SECURE_COOKIE=false` is set in `docker-compose.yml` under n8n environment.
 
 ### n8n container keeps restarting
 
-Check if PostgreSQL is healthy:
-
 ```bash
+# Check PostgreSQL health
 podman-compose logs postgres
+
+# Check n8n error logs
+podman-compose logs n8n
 ```
 
-### Cannot connect to database
+### Port conflict
 
-Verify PostgreSQL credentials match in both services:
+If port 15678 is already in use, change `N8N_PORT` in `.env`:
 
 ```bash
-podman-compose config
+N8N_PORT=25678
 ```
 
-### Permission denied errors
+Then restart: `podman-compose down && podman-compose up -d`
 
-Ensure volumes have correct permissions:
+### Cannot connect from other devices on the network
+
+Verify `N8N_HOST=0.0.0.0` in `.env` and check firewall rules:
 
 ```bash
-podman volume inspect podman_docker_app_postgres_data
-podman volume inspect podman_docker_app_n8n_data
+# Check if port is open
+ss -tlnp | grep 15678
 ```
 
 ---
 
 ## AI Quick Deploy
 
-> This section is designed for AI assistants to quickly deploy n8n.
+> This section is designed for AI assistants to quickly deploy n8n from this repository.
 
-### Prerequisites Check
+### Prerequisites
 
 ```bash
-# Verify podman-compose is installed
-podman-compose --version
+podman --version && podman-compose --version
 ```
 
-### One-Command Deploy
+### Deploy
 
 ```bash
-cp .env.example .env && podman-compose up -d && podman-compose ps
+git clone https://github.com/WOOWTECH/Woow_n8n_docker_compose_all.git
+cd Woow_n8n_docker_compose_all
+cp .env.example .env
+# Update WEBHOOK_URL with actual server IP
+SERVER_IP=$(hostname -I | awk '{print $1}')
+sed -i "s|WEBHOOK_URL=http://localhost:15678/|WEBHOOK_URL=http://${SERVER_IP}:15678/|" .env
+podman-compose up -d
 ```
 
-### Verify Deployment
+### Verify
 
 ```bash
-# Check all containers are running
-podman-compose ps
-
-# Check n8n is responding
-curl -s http://localhost:5678/healthz || echo "Waiting for n8n to start..."
+sleep 10 && podman-compose ps && curl -s http://localhost:15678/healthz
 ```
 
-### Quick Teardown
+### Teardown
 
 ```bash
-# Stop and remove containers (keep data)
+# Keep data
 podman-compose down
 
-# Stop and remove containers AND volumes (delete all data)
+# Delete everything including data
 podman-compose down -v
 ```
 
-### Configuration Summary
+### Configuration Reference
 
-- **n8n URL**: `http://<SERVER_IP>:5678`
-- **Database**: PostgreSQL 16 (internal, port 5432)
-- **Authentication**: n8n built-in user system (first user becomes admin)
-- **Data persistence**: Named volumes (`postgres_data`, `n8n_data`)
-- **Auto-restart**: Enabled (`unless-stopped`)
+| Item | Value |
+|------|-------|
+| n8n URL | `http://<SERVER_IP>:15678` |
+| Database | PostgreSQL 16 (internal port 5432) |
+| Auth | n8n built-in (first user = admin) |
+| HTTP Login | Enabled (`N8N_SECURE_COOKIE=false`) |
+| Data | Named volumes (`postgres_data`, `n8n_data`) |
+| Auto-restart | `unless-stopped` |
+| Network | `n8n-network` |
