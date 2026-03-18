@@ -1,0 +1,34 @@
+---
+# PVC for n8n workflow data, credentials, and SQLite database
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: n8n-data
+  namespace: n8n
+  labels:
+    app: n8n
+    component: n8n
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi
+---
+# PVC for n8n-mcp server logs
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mcp-logs
+  namespace: n8n
+  labels:
+    app: n8n
+    component: n8n-mcp
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
