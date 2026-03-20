@@ -26,6 +26,40 @@ Deploy [n8n](https://n8n.io/) workflow automation platform with PostgreSQL datab
 └──────────────────────────────────────────────────┘
 ```
 
+## Deploy to Portainer
+
+Deploy this project instantly using Portainer's Stack feature with our GitHub repository URL.
+
+[![Deploy to Portainer](https://img.shields.io/badge/Deploy_to-Portainer-13BEF9?style=for-the-badge&logo=portainer&logoColor=white)](#deploy-to-portainer)
+
+### Via Git Repository (Recommended)
+
+1. Log in to your Portainer dashboard
+2. Navigate to **Stacks** → **Add stack**
+3. Select **Repository**
+4. Fill in the following:
+
+   | Field | Value |
+   |-------|-------|
+   | **Repository URL** | `https://github.com/WOOWTECH/Woow_n8n_docker_compose_all` |
+   | **Repository reference** | `refs/heads/podman` |
+   | **Compose path** | `docker-compose.yml` |
+
+5. Click **Deploy the stack**
+
+### Via Web Editor
+
+1. Copy the raw URL of `docker-compose.yml`:
+
+   ```
+   https://raw.githubusercontent.com/WOOWTECH/Woow_n8n_docker_compose_all/podman/docker-compose.yml
+   ```
+
+2. Log in to Portainer → **Stacks** → **Add stack** → **Web editor**
+3. Fetch the content from the URL above using `curl` or your browser, paste into the editor
+4. Set environment variables (refer to `.env`)
+5. Click **Deploy the stack**
+
 ## Prerequisites
 
 - Podman (v4.0+)
